@@ -67,7 +67,7 @@ export default function LiveGlobe({
 
       // Zoom-aware dot radius (smaller when zooming in)
       const BASE_ALT = 1.8;
-      const BASE_RADIUS = 0.5;
+      const BASE_RADIUS = 0.1;
       const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
       let currAlt = BASE_ALT;
       const scaleFromAlt = (alt: number) => clamp(alt / BASE_ALT, 0.25, 2);
@@ -78,7 +78,7 @@ export default function LiveGlobe({
           `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`
         )
         .pointsMerge(false)
-        .pointAltitude(0.02)
+        .pointAltitude(0.2)
         .pointRadius(radiusAccessor)
         .pointResolution(20)
         .pointColor((d: ShipPoint) =>
@@ -97,7 +97,7 @@ export default function LiveGlobe({
         .onPointClick((d: ShipPoint) => {
           setSelected(d);
           if (controlsRef.current) controlsRef.current.autoRotate = false; // stop spin on click
-          globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.9 }, 700);
+          globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.1 }, 700);
         });
 
       globe.onZoom(({ altitude }: { lat: number; lng: number; altitude: number }) => {
@@ -156,10 +156,11 @@ export default function LiveGlobe({
       // Techy visuals: sonar rings + glowing spheres
       globe
         .ringsData([])
-        .ringColor((d: ShipPoint) =>
-          d.conf && d.conf < 0.5 ? "rgba(0,255,200,0.65)" : "rgba(255,120,160,0.65)"
-        )
-        .ringMaxRadius(2.8)
+        .ringColor((d: ShipPoint) => [
+          "rgba(0,255,200,0.35)",  // inner ring color
+          "rgba(0,255,200,0.65)"   // outer ring color
+        ])
+        .ringMaxRadius(10.8)
         .ringPropagationSpeed(2.3)
         .ringRepeatPeriod(0);
 
