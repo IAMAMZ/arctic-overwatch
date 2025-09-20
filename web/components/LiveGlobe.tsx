@@ -19,15 +19,14 @@ type GJ = { type: "FeatureCollection"; features: GJFeature[] };
 
 export default function LiveGlobe({
   geojsonUrl = "/data/year_ships_water.geojson",
-  simHoursPerSec = 24,
-  pointSize = 0.9
+  simHoursPerSec = 24
 }: {
   geojsonUrl?: string;
   simHoursPerSec?: number;
-  pointSize?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<any>(null);
+  const controlsRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
 
   const [loaded, setLoaded] = useState(false);
@@ -47,49 +46,78 @@ export default function LiveGlobe({
           ? GlobeModule()(containerRef.current)
           : new (GlobeModule as any)(containerRef.current);
 
-      globe.enablePointerInteraction(true);
+      // --- Space background + gentle auto-rotate (will pause on selection) ---
+      globe
+        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+        .showAtmosphere(true);
+
+      const controls = globe.controls();
+      if (controls) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.35;
+        controlsRef.current = controls;
+      }
+
+      // --- Zoom-aware dot radius (smaller when zooming in) ---
+      const BASE_ALT = 1.8;    // initial camera altitude
+      const BASE_RADIUS = 0.9; // base angular radius
+      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+      let currAlt = BASE_ALT;
+      const scaleFromAlt = (alt: number) => clamp(alt / BASE_ALT, 0.25, 2);
+      const radiusAccessor = () => BASE_RADIUS * scaleFromAlt(currAlt);
 
       globe
+        // Optional surface detail under the starfield
         .globeTileEngineUrl((x: number, y: number, l: number) =>
           `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`
         )
-        // IMPORTANT: disable merge so hover/click work
+        // Points layer (merge=false so hover/click work)
         .pointsMerge(false)
         .pointAltitude(0.02)
-        .pointRadius(pointSize)
-        .pointResolution(16) // smoother hit area
+        .pointRadius(radiusAccessor)
+        .pointResolution(16)
         .pointColor((d: ShipPoint) => (d.conf && d.conf < 0.5 ? "#00ff88" : "#ff3355"))
         .pointLabel((d: ShipPoint) => {
           const t = new Date(d.ts).toISOString();
           return `<div><b>MMSI:</b> ${d.mmsi ?? "—"}<br/><b>Time (UTC):</b> ${t}<br/><b>Conf:</b> ${d.conf ?? "—"}</div>`;
         })
         .pointsTransitionDuration(300)
-        .showPointerCursor(true) // built-in cursor helper
+        .showPointerCursor(true)
         .onPointHover((d: ShipPoint | null) => {
           if (!containerRef.current) return;
           containerRef.current.style.cursor = d ? "pointer" : "grab";
         })
-        .onPointClick((d: ShipPoint, _evt: MouseEvent, coords: { lat: number; lng: number; altitude: number }) => {
-          console.log("Clicked:", d, coords);
-          setSelected(d);
-          globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.9 }, 900);
+        .onPointClick((d: ShipPoint) => {
+          setSelected(d);                 // show info
+          if (controlsRef.current) {
+            controlsRef.current.autoRotate = false; // ⛔ stop spin on click
+          }
         });
+
+      // keep radius in sync with camera zoom
+      globe.onZoom(({ altitude }: { lat: number; lng: number; altitude: number }) => {
+        currAlt = altitude;
+        globe.pointRadius(radiusAccessor).pointsTransitionDuration(0);
+      });
 
       globeRef.current = globe;
 
+      // Fit viewport + initial POV
       const resize = () => {
         globe.width(window.innerWidth);
         globe.height(window.innerHeight);
-        globe.pointOfView({ lat: 72, lng: -95, altitude: 1.8 }, 0);
+        globe.pointOfView({ lat: 72, lng: -95, altitude: BASE_ALT }, 0);
       };
       resize();
       window.addEventListener("resize", resize);
 
-      // fetch data
+      // ---- Load GeoJSON ----
       const res = await fetch(`${geojsonUrl}?t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Failed to load ${geojsonUrl} (${res.status})`);
       const gj: GJ = await res.json();
       if (!gj?.features) throw new Error("GeoJSON missing features array");
 
+      // Normalize + sort
       const all: ShipPoint[] = gj.features
         .filter(f => f.geometry?.type === "Point")
         .map(f => {
@@ -107,6 +135,7 @@ export default function LiveGlobe({
         return;
       }
 
+      // ---- Playback of dots over the year ----
       const t0 = all[0].ts;
       const t1 = all[all.length - 1].ts;
 
@@ -124,7 +153,7 @@ export default function LiveGlobe({
         simStartRT = performance.now();
         simStartTs = t0;
         idx = 0;
-        setSelected(null);
+        // don't auto-resume spin here; user intent is focused on selection flow
       };
 
       const tick = () => {
@@ -147,6 +176,7 @@ export default function LiveGlobe({
       timerRef.current = requestAnimationFrame(tick);
       setLoaded(true);
 
+      // Cleanup
       return () => {
         isAlive = false;
         if (timerRef.current) cancelAnimationFrame(timerRef.current);
@@ -159,9 +189,17 @@ export default function LiveGlobe({
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geojsonUrl, simHoursPerSec, pointSize]);
+  }, [geojsonUrl, simHoursPerSec]);
 
   const fmt = (n?: number, digits = 3) => (typeof n === "number" ? n.toFixed(digits) : "—");
+
+  // When the info panel closes, resume auto-rotate
+  const closePanel = () => {
+    setSelected(null);
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = true; // ▶️ resume spin when panel closes
+    }
+  };
 
   return (
     <>
@@ -189,7 +227,7 @@ export default function LiveGlobe({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <strong>Ship Detection</strong>
             <button
-              onClick={() => setSelected(null)}
+              onClick={closePanel}
               style={{ background: "transparent", color: "#fff", border: "none", cursor: "pointer", fontSize: 18 }}
               aria-label="Close"
             >
