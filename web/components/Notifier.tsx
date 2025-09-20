@@ -9,7 +9,7 @@ export default function Notifier({ message }: { message: string | null }) {
   useEffect(() => {
     if (!message) return setVisible(false);
     setVisible(true);
-    const t = setTimeout(() => setVisible(false), 5000); // auto-hide
+    const t = setTimeout(() => setVisible(false), 10000); // auto-hide
     return () => clearTimeout(t);
   }, [message]);
 
