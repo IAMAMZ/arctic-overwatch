@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Enhanced Flask backend for SAR Vessel Detection
-Includes detailed ship information and confidence-based visualization
+Includes detailed ship information, wake pattern visualization, and confidence-based visualization
 """
 
 from flask import Flask, render_template_string, jsonify, request
@@ -9,6 +9,7 @@ from flask_cors import CORS
 import pandas as pd
 import json
 import os
+import base64
 from pathlib import Path
 import tempfile
 import uuid
@@ -112,7 +113,21 @@ def load_detections():
                 'draft_m': str(row.get('draft_m', 'Unknown')) if pd.notna(row.get('draft_m')) else 'Unknown',
                 'tonnage_gt': str(row.get('tonnage_gt', 'Unknown')) if pd.notna(row.get('tonnage_gt')) else 'Unknown',
                 'flag_state': str(row.get('flag_state', 'Unknown')) if pd.notna(row.get('flag_state')) else 'Unknown',
-                'vessel_name': str(row.get('vessel_name', 'UNKNOWN CONTACT')) if pd.notna(row.get('vessel_name')) else 'UNKNOWN CONTACT'
+                'vessel_name': str(row.get('vessel_name', 'UNKNOWN CONTACT')) if pd.notna(row.get('vessel_name')) else 'UNKNOWN CONTACT',
+                'claimed_specs': str(row.get('claimed_specs', '')) if pd.notna(row.get('claimed_specs')) else '',
+                'ai_analysis': str(row.get('ai_analysis', '')) if pd.notna(row.get('ai_analysis')) else '',
+                'expected_wake_type': str(row.get('expected_wake_type', 'Type-Unknown')) if pd.notna(row.get('expected_wake_type')) else 'Type-Unknown',
+                'actual_wake_type': str(row.get('actual_wake_type', 'Type-Unknown')) if pd.notna(row.get('actual_wake_type')) else 'Type-Unknown',
+                'wake_angle_deg': float(row.get('wake_angle_deg', 0)) if pd.notna(row.get('wake_angle_deg')) else 0,
+                'wake_length_km': float(row.get('wake_length_km', 0)) if pd.notna(row.get('wake_length_km')) else 0,
+                'wake_width_m': float(row.get('wake_width_m', 0)) if pd.notna(row.get('wake_width_m')) else 0,
+                'wake_confidence_match': float(row.get('wake_confidence_match', 0)) if pd.notna(row.get('wake_confidence_match')) else 0,
+                'wake_match_vessel': str(row.get('wake_match_vessel', '')) if pd.notna(row.get('wake_match_vessel')) else '',
+                'ai_commentary': str(row.get('ai_commentary', '')) if pd.notna(row.get('ai_commentary')) else '',
+                'sea_ice_coverage_pct': float(row.get('sea_ice_coverage_pct', 0)) if pd.notna(row.get('sea_ice_coverage_pct')) else 0,
+                'processing_time_s': float(row.get('processing_time_s', 0)) if pd.notna(row.get('processing_time_s')) else 0,
+                'surveillance_gap_hours': float(row.get('surveillance_gap_hours', 0)) if pd.notna(row.get('surveillance_gap_hours')) else 0,
+                'wake_persistence_detected': bool(row.get('wake_persistence_detected', False)) if pd.notna(row.get('wake_persistence_detected')) else False
             }
             
             # Only include detections with valid coordinates
@@ -228,7 +243,7 @@ def get_fallback_bounds(region_name):
     
     return None
 
-# Enhanced HTML template with confidence-based ship icons
+# Enhanced HTML template with confidence-based ship icons and wake pattern images
 MAP_ONLY_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -236,8 +251,8 @@ MAP_ONLY_TEMPLATE = """
     <title>Arctic Overwatch - Enhanced Ship Detection</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css  " />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css  " />
     <style>
         body, html { 
             margin: 0; 
@@ -294,12 +309,29 @@ MAP_ONLY_TEMPLATE = """
             color: white;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
         }
+        .wake-image {
+            max-width: 100%;
+            max-height: 150px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .image-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .image-label {
+            font-weight: bold;
+            color: #555;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js  "></script>
     <script>
         // Global variables
         let map;
@@ -322,7 +354,7 @@ MAP_ONLY_TEMPLATE = """
                 attribution: '© OpenStreetMap contributors'
             });
             
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/  {z}/{y}/{x}', {
                 attribution: 'Tiles © Esri'
             });
             
@@ -417,6 +449,24 @@ MAP_ONLY_TEMPLATE = """
             return 'confidence-low';
         }
 
+        function getWakeImage(wakeType) {
+            // Map wake types to image filenames
+            const wakeImageMap = {
+                'Type-A': 'A.jpg',
+                'Type-B': 'B.jpg',
+                'Type-C': 'C.jpg',
+                'Type-D': 'D.jpg',
+                'Type-E': 'E.jpg',
+                'Type-F': 'F.jpg',
+                'Type-Unknown': 'A.jpg' // Default to Type A
+            };
+            
+            const imageName = wakeImageMap[wakeType] || 'A.jpg';
+            
+            // Create URL for the wake image
+            return `/web/public/Assets/wake/${imageName}`;
+        }
+
         function updateMap() {
             // Clear existing markers
             detectionsLayer.clearLayers();
@@ -454,89 +504,139 @@ MAP_ONLY_TEMPLATE = """
             }
         }
 
-        function createEnhancedPopupContent(detection) {
-            const confidence = detection.confidence || 50;
-            const confidenceColor = getConfidenceColor(confidence);
-            const vesselName = detection.vessel_name || 'UNKNOWN CONTACT';
-            const shipType = detection.ship_type || 'Unknown Vessel';
-            const shipModel = detection.ship_model || 'Unidentified';
-            
-            let dimensionsInfo = '';
-            if (detection.length_m !== 'Unknown') {
-                dimensionsInfo = `
-                    <div class="popup-section">
-                        <strong>Vessel Dimensions:</strong><br>
-                        Length: ${detection.length_m}m | Beam: ${detection.beam_m}m | Draft: ${detection.draft_m}m<br>
-                        Tonnage: ${detection.tonnage_gt} GT
-                    </div>
-                `;
-            }
-            
-            let technicalInfo = '';
-            if (detection.engine_type !== 'Unknown') {
-                technicalInfo = `
-                    <div class="popup-section">
-                        <strong>Technical Specifications:</strong><br>
-                        Engine: ${detection.engine_type}<br>
-                        Model: ${shipModel}<br>
-                        Flag State: ${detection.flag_state}
-                    </div>
-                `;
-            }
-            
-            let locationInfo = '';
-            if (detection.region || detection.area_description) {
-                locationInfo = `
-                    <div class="popup-section">
-                        ${detection.region ? `<strong>Region:</strong> ${detection.region}<br>` : ''}
-                        ${detection.area_description ? `<strong>Location:</strong> ${detection.area_description}<br>` : ''}
-                        ${detection.country ? `<strong>Jurisdiction:</strong> ${detection.country}` : ''}
-                    </div>
-                `;
-            }
-            
-            const aisInfo = detection.has_ais_match ? 
-                '<span style="color: #28a745; font-weight: bold;">✓ AIS Match</span>' : 
-                '<span style="color: #dc3545; font-weight: bold;">✗ No AIS Match (Dark Vessel)</span>';
-            
-            return `
-                <div style="min-width: 300px; max-width: 400px;">
-                    <div class="popup-header">
-                        <h6 style="margin: 0; font-size: 16px;">
-                            <i class="fas ${getShipIcon(shipType)}"></i> ${vesselName}
-                        </h6>
-                        <div style="font-size: 12px; opacity: 0.8;">Detection #${detection.id} | ${shipType}</div>
-                    </div>
-                    
-                    <div class="popup-section">
-                        <strong>ML Confidence:</strong>
-                        <div class="confidence-bar">
-                            <div class="confidence-fill" style="width: ${confidence}%; background: ${confidenceColor};">
-                                <div class="confidence-text">${confidence.toFixed(1)}%</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="popup-section">
-                        <strong>Position:</strong> ${detection.lat.toFixed(4)}°N, ${Math.abs(detection.lon).toFixed(4)}°${detection.lon < 0 ? 'W' : 'E'}<br>
-                        <strong>Radar Signature:</strong> ${detection.intensity_db.toFixed(1)} dB | ${detection.area_pixels} pixels<br>
-                        <strong>Status:</strong> ${aisInfo}
-                    </div>
-                    
-                    ${technicalInfo}
-                    ${dimensionsInfo}
-                    ${locationInfo}
-                    
-                    ${detection.nearest_mmsi ? `
-                        <div class="popup-section">
-                            <strong>AIS Correlation:</strong><br>
-                            MMSI: ${detection.nearest_mmsi}<br>
-                            Distance: ${Math.round(detection.nearest_distance_m)}m
-                        </div>
-                    ` : ''}
+function createEnhancedPopupContent(detection) {
+    const confidence = detection.confidence || 50;
+    const confidenceColor = getConfidenceColor(confidence);
+    const vesselName = detection.vessel_name || 'UNKNOWN CONTACT';
+    const shipType = detection.ship_type || 'Unknown Vessel';
+    const shipModel = detection.ship_model || 'Unidentified';
+    
+// Wake image paths pointing to Next.js server
+const getWakeImagePath = (wakeType) => {
+    // Assuming Next.js runs on port 3000 and Flask on 5000
+    const nextJsUrl = 'http://localhost:3000';
+    
+    switch(wakeType) {
+        case 'Type-A': return `${nextJsUrl}/Assets/wake/A.jpg`;
+        case 'Type-B': return `${nextJsUrl}/Assets/wake/B.jpg`;
+        case 'Type-C': return `${nextJsUrl}/Assets/wake/C.jpg`;
+        case 'Type-D': return `${nextJsUrl}/Assets/wake/D.jpg`;
+        case 'Type-E': return `${nextJsUrl}/Assets/wake/E.jpg`;
+        case 'Type-F': return `${nextJsUrl}/Assets/wake/F.jpg`;
+        case 'Type-G': return `${nextJsUrl}/Assets/wake/G.jpg`;
+        case 'Type-H': return `${nextJsUrl}/Assets/wake/H.jpg`;
+        case 'Type-Unknown': return `${nextJsUrl}/Assets/wake/A.jpg`;
+        default: return `${nextJsUrl}/Assets/wake/A.jpg`;
+    }
+};
+    
+    const expectedWakeImage = getWakeImagePath(detection.expected_wake_type || 'Type-Unknown');
+    const actualWakeImage = getWakeImagePath(detection.actual_wake_type || 'Type-Unknown');
+    
+    let dimensionsInfo = '';
+    if (detection.length_m !== 'Unknown') {
+        dimensionsInfo = `
+            <div class="popup-section">
+                <strong>Vessel Dimensions:</strong><br>
+                Length: ${detection.length_m}m | Beam: ${detection.beam_m}m | Draft: ${detection.draft_m}m<br>
+                Tonnage: ${detection.tonnage_gt} GT
+            </div>
+        `;
+    }
+    
+    let technicalInfo = '';
+    if (detection.engine_type !== 'Unknown') {
+        technicalInfo = `
+            <div class="popup-section">
+                <strong>Technical Specifications:</strong><br>
+                Engine: ${detection.engine_type}<br>
+                Model: ${shipModel}<br>
+                Flag State: ${detection.flag_state}
+            </div>
+        `;
+    }
+    
+    let locationInfo = '';
+    if (detection.region || detection.area_description) {
+        locationInfo = `
+            <div class="popup-section">
+                ${detection.region ? `<strong>Region:</strong> ${detection.region}<br>` : ''}
+                ${detection.area_description ? `<strong>Location:</strong> ${detection.area_description}<br>` : ''}
+                ${detection.country ? `<strong>Jurisdiction:</strong> ${detection.country}` : ''}
+            </div>
+        `;
+    }
+    
+    const aisInfo = detection.has_ais_match ? 
+        '<span style="color: #28a745; font-weight: bold;">✓ AIS Match</span>' : 
+        '<span style="color: #dc3545; font-weight: bold;">✗ No AIS Match (Dark Vessel)</span>';
+    
+    // Wake pattern information with hardcoded image paths
+    const wakePatternInfo = `
+        <div class="popup-section">
+            <strong>Wake Pattern Analysis:</strong><br>
+            <div style="display: flex; gap: 15px; margin: 10px 0; align-items: center;">
+                <div style="text-align: center;">
+                    <div style="font-weight: bold; margin-bottom: 5px;">Expected (${detection.expected_wake_type})</div>
+                    <img src="${expectedWakeImage}" alt="Expected wake pattern" style="max-width: 120px; max-height: 120px; border: 1px solid #ccc; border-radius: 4px;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=&quot;color:red;&quot;>Image not found</div>';" />
                 </div>
-            `;
-        }
+                <div style="text-align: center;">
+                    <div style="font-weight: bold; margin-bottom: 5px;">Actual (${detection.actual_wake_type})</div>
+                    <img src="${actualWakeImage}" alt="Actual wake pattern" style="max-width: 120px; max-height: 120px; border: 1px solid #ccc; border-radius: 4px;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=&quot;color:red;&quot;>Image not found</div>';" />
+                </div>
+            </div>
+            <div style="margin-top: 5px; font-size: 14px;">
+                <strong>Match Confidence:</strong> ${detection.wake_confidence_match.toFixed(1)}%<br>
+                <strong>Angle:</strong> ${detection.wake_angle_deg.toFixed(1)}° | 
+                <strong>Length:</strong> ${detection.wake_length_km.toFixed(1)}km | 
+                <strong>Width:</strong> ${detection.wake_width_m.toFixed(1)}m
+            </div>
+        </div>
+    `;
+    
+    return `
+        <div style="min-width: 300px; max-width: 450px;">
+            <div class="popup-header">
+                <h6 style="margin: 0; font-size: 16px;">
+                    <i class="fas ${getShipIcon(shipType)}"></i> ${vesselName}
+                </h6>
+                <div style="font-size: 12px; opacity: 0.8;">Detection #${detection.id} | ${shipType}</div>
+            </div>
+            
+            <div class="popup-section">
+                <strong>ML Confidence:</strong>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width: ${confidence}%; background: ${confidenceColor};">
+                        <div class="confidence-text">${confidence.toFixed(1)}%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="popup-section">
+                <strong>Position:</strong> ${detection.lat.toFixed(4)}°N, ${Math.abs(detection.lon).toFixed(4)}°${detection.lon < 0 ? 'W' : 'E'}<br>
+                <strong>Radar Signature:</strong> ${detection.intensity_db.toFixed(1)} dB | ${detection.area_pixels} pixels<br>
+                <strong>Status:</strong> ${aisInfo}
+            </div>
+            
+            ${technicalInfo}
+            ${dimensionsInfo}
+            ${locationInfo}
+            ${wakePatternInfo}
+            
+            ${detection.nearest_mmsi ? `
+                <div class="popup-section">
+                    <strong>AIS Correlation:</strong><br>
+                    MMSI: ${detection.nearest_mmsi}<br>
+                    Distance: ${Math.round(detection.nearest_distance_m)}m
+                </div>
+            ` : ''}
+            <div class="popup-section">
+                <strong>AI Commentary:</strong><br>
+                ${detection.ai_commentary}
+            </div>
+        </div>
+    `;
+}
 
         // Refresh function for external calls
         window.refreshMap = function() {
@@ -981,6 +1081,7 @@ def health_check():
             'Ship Type Classification',
             'Vessel Identification',
             'Technical Specifications',
+            'Wake Pattern Visualization',
             'Enhanced Regional Analysis'
         ]
     })
