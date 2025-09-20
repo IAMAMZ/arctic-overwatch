@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Notifier from "./Notifier";
+
 
 type ShipPoint = {
   lat: number;
   lng: number;
-  ts: number;
+  ts: number;       // epoch ms
   mmsi?: string;
   conf?: number;
 };
@@ -13,16 +15,18 @@ type ShipPoint = {
 type GJFeature = {
   type: "Feature";
   geometry: { type: "Point"; coordinates: [number, number] };
-  properties: { timestamp: string | number; mmsi?: string; conf?: number };
+  properties: { timestamp?: string | number; mmsi?: string; conf?: number };
 };
 type GJ = { type: "FeatureCollection"; features: GJFeature[] };
 
 export default function LiveGlobe({
-  geojsonUrl = "/data/year_ships_water.geojson",
-  simHoursPerSec = 24
+  geojsonUrl = "/data/detection_ship.geojson",
+  simMsPerSec = 60 * 2000,            // 1s = 24h by default → one full day/second; tweak to taste
+  targetDateISO = "2025-07-22"    // <-- all points will be remapped into this UTC day
 }: {
   geojsonUrl?: string;
-  simHoursPerSec?: number;
+  simMsPerSec?: number;
+  targetDateISO?: string;         // YYYY-MM-DD
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<any>(null);
@@ -31,6 +35,9 @@ export default function LiveGlobe({
 
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<ShipPoint | null>(null);
+  const [simClock, setSimClock] = useState<string>("--:-- UTC");
+  const [notif, setNotif] = useState<string | null>(null);
+
 
   useEffect(() => {
     let isAlive = true;
@@ -40,8 +47,6 @@ export default function LiveGlobe({
 
       const mod = await import("globe.gl");
       const GlobeModule: any = (mod as any).default ?? mod;
-
-      // Three for custom objects (glowing spheres + halo sprite)
       const THREE = await import("three");
 
       const globe =
@@ -49,7 +54,7 @@ export default function LiveGlobe({
           ? GlobeModule()(containerRef.current)
           : new (GlobeModule as any)(containerRef.current);
 
-      // === Space background + auto-rotate (paused on click) ===
+      // Space background + auto-rotate (paused on selection)
       globe
         .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
         .showAtmosphere(true);
@@ -57,38 +62,35 @@ export default function LiveGlobe({
       const controls = globe.controls();
       if (controls) {
         controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.35;
+        controls.autoRotateSpeed = 0.15;
         controlsRef.current = controls;
       }
 
-      // Add a bit more ambient light so emissive pops nicely
-      const ambient = new THREE.AmbientLight(0xffffff, 1.0);
-      globe.scene().add(ambient);
+      // Ambient light to help emissive materials pop
+      globe.scene().add(new THREE.AmbientLight(0xffffff, 1.0));
 
-      // === Zoom-aware dot radius (smaller when zooming in) ===
-      const BASE_ALT = 1.8;    // initial camera altitude
-      const BASE_RADIUS = 0.9; // base angular radius (tweak to taste)
+      // Zoom-aware dot radius (smaller when zooming in)
+      const BASE_ALT = 1.8;
+      const BASE_RADIUS = 0.1;
       const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
       let currAlt = BASE_ALT;
       const scaleFromAlt = (alt: number) => clamp(alt / BASE_ALT, 0.25, 2);
       const radiusAccessor = () => BASE_RADIUS * scaleFromAlt(currAlt);
 
       globe
-        // Optional surface: satellite tiles under the starfield
         .globeTileEngineUrl((x: number, y: number, l: number) =>
           `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`
         )
-        // Points layer (kept for hover/click + the “dot” look)
-        .pointsMerge(false)          // needed for hover/click
-        .pointAltitude(0.02)
-        .pointRadius(radiusAccessor) // zoom-aware
+        .pointsMerge(false)
+        .pointAltitude(0.2)
+        .pointRadius(radiusAccessor)
         .pointResolution(20)
         .pointColor((d: ShipPoint) =>
           d.conf && d.conf < 0.5 ? "rgba(0,255,170,0.95)" : "rgba(255,60,100,0.95)"
         )
         .pointLabel((d: ShipPoint) => {
-          const t = new Date(d.ts).toISOString();
-          return `<div><b>MMSI:</b> ${d.mmsi ?? "—"}<br/><b>Time (UTC):</b> ${t}<br/><b>Conf:</b> ${d.conf ?? "—"}</div>`;
+          const t = new Date(d.ts).toISOString().replace("T", " ").replace(".000Z", "Z");
+          return `<div><b>MMSI:</b> ${d.mmsi ?? "??"}<br/><b>Time (UTC):</b> ${t}<br/><b>Conf:</b> ${d.conf ?? "—"}</div>`;
         })
         .pointsTransitionDuration(300)
         .showPointerCursor(true)
@@ -98,9 +100,8 @@ export default function LiveGlobe({
         })
         .onPointClick((d: ShipPoint) => {
           setSelected(d);
-          if (controlsRef.current) controlsRef.current.autoRotate = false; // stop spin on selection
-          // (optional zoom-to)
-          globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.9 }, 700);
+          if (controlsRef.current) controlsRef.current.autoRotate = false; // stop spin on click
+          globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.1 }, 700);
         });
 
       globe.onZoom(({ altitude }: { lat: number; lng: number; altitude: number }) => {
@@ -119,98 +120,109 @@ export default function LiveGlobe({
       resize();
       window.addEventListener("resize", resize);
 
-      // === Load GeoJSON ===
+      // Load GeoJSON
       const res = await fetch(`${geojsonUrl}?t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to load ${geojsonUrl} (${res.status})`);
       const gj: GJ = await res.json();
       if (!gj?.features) throw new Error("GeoJSON missing features array");
 
-      // Normalize + sort by time
-      const all: ShipPoint[] = gj.features
+      // Normalize (ignore original timestamps; we’ll remap into the target day)
+      const raw: ShipPoint[] = gj.features
         .filter(f => f.geometry?.type === "Point")
         .map(f => {
           const [lng, lat] = f.geometry.coordinates;
-          const raw = f.properties.timestamp;
-          const ts = typeof raw === "number" ? raw : Date.parse(raw);
-          return { lat, lng, ts, mmsi: f.properties.mmsi, conf: f.properties.conf };
-        })
-        .filter(p => Number.isFinite(p.ts))
-        .sort((a, b) => a.ts - b.ts);
+          // keep mmsi/conf if present
+          return {
+            lat,
+            lng,
+            ts: 0, // placeholder
+            mmsi: f.properties.mmsi,
+            conf: f.properties.conf
+          };
+        });
 
-      if (!all.length) {
+      if (!raw.length) {
         console.warn("No valid points in GeoJSON.");
         setLoaded(true);
         return;
       }
 
-      // === “Techy” visual layer 1: Sonar rings on appearances ===
-      // Use same data array we progressively append to.
-      globe
-        .ringsData([]) // start empty, we’ll keep reassigning
-        .ringColor((d: ShipPoint) =>
-          d.conf && d.conf < 0.5 ? "rgba(0,255,200,0.65)" : "rgba(255,120,160,0.65)"
-        )
-        .ringMaxRadius(10)          // degrees
-        .ringPropagationSpeed(2.3)   // degrees/sec
-        .ringRepeatPeriod(0);        // single ping per point
+      // >>> Force everything into targetDateISO (UTC), evenly spread across the day
+      const dayStart = Date.parse(`${targetDateISO}T00:00:00Z`);
+      const dayMs = 24 * 3600 * 1000;
+      const step = raw.length > 1 ? Math.floor(dayMs / raw.length) : 0;
 
-      // === “Techy” visual layer 2: Glowing spheres (3D objects) at detections ===
-      // Build a small glowing orb + a halo sprite, then clone per point.
+      const all: ShipPoint[] = raw.map((p, i) => ({
+        ...p,
+        ts: dayStart + i * step
+      }));
+
+      // Techy visuals: sonar rings + glowing spheres
+      globe
+        .ringsData([])
+        .ringColor((d: ShipPoint) => [
+          "rgba(0,255,200,0.35)",  // inner ring color
+          "rgba(0,255,200,0.65)"   // outer ring color
+        ])
+        .ringMaxRadius(10.8)
+        .ringPropagationSpeed(2.3)
+        .ringRepeatPeriod(0);
+
       const buildGlowSprite = () => {
         const size = 128;
         const canvas = document.createElement("canvas");
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext("2d")!;
-        const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
         g.addColorStop(0.0, "rgba(0,255,220,0.9)");
         g.addColorStop(0.4, "rgba(0,255,220,0.25)");
         g.addColorStop(1.0, "rgba(0,255,220,0.0)");
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, size, size);
-        const tex = new THREE.Texture(canvas);
+        const tex = new (THREE as any).Texture(canvas);
         tex.needsUpdate = true;
-        const material = new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true });
-        const sprite = new THREE.Sprite(material);
-        sprite.scale.set(0.35, 0.35, 1); // adjust halo size
+        const material = new (THREE as any).SpriteMaterial({ map: tex, depthWrite: false, transparent: true });
+        const sprite = new (THREE as any).Sprite(material);
+        sprite.scale.set(0.35, 0.35, 1);
         return sprite;
       };
 
       const buildShipGlow = (d: ShipPoint) => {
-        const orbGeom = new THREE.SphereGeometry(0.035, 20, 20);
+        const orbGeom = new (THREE as any).SphereGeometry(0.035, 20, 20);
         const color = d.conf && d.conf < 0.5 ? 0x00ffb0 : 0xff3c64;
-        const mat = new THREE.MeshStandardMaterial({
+        const mat = new (THREE as any).MeshStandardMaterial({
           color,
           emissive: color,
           emissiveIntensity: 1.2,
           metalness: 0.2,
           roughness: 0.3
         });
-        const orb = new THREE.Mesh(orbGeom, mat);
+        const orb = new (THREE as any).Mesh(orbGeom, mat);
         const halo = buildGlowSprite();
-        const group = new THREE.Group();
+        const group = new (THREE as any).Group();
         group.add(orb);
         group.add(halo);
         return group;
       };
 
       globe
-        .objectsData([]) // start empty; we'll mirror `displayed`
+        .objectsData([])
         .objectLat((d: ShipPoint) => d.lat)
         .objectLng((d: ShipPoint) => d.lng)
         .objectAltitude(0.028)
         .objectThreeObject((d: ShipPoint) => buildShipGlow(d));
 
-      // === Playback over the year (progressively add items) ===
-      const t0 = all[0].ts;
-      const t1 = all[all.length - 1].ts;
+      // === Simulation strictly over the 24h of targetDateISO ===
+      const t0 = dayStart;
+      const t1 = dayStart + dayMs - 1;
 
       const displayed: ShipPoint[] = [];
-      globe.pointsData(displayed);   // dots
-      globe.ringsData(displayed);    // rings follow same array
-      globe.objectsData(displayed);  // glowing spheres mirror the array
+      globe.pointsData(displayed);
+      globe.ringsData(displayed);
+      globe.objectsData(displayed);
 
-      const simMsPerSec = simHoursPerSec * 3600 * 1000;
+      const simMsPerSec = 60 * 5000;
       let simStartRT = performance.now();
       let simStartTs = t0;
       let idx = 0;
@@ -223,7 +235,15 @@ export default function LiveGlobe({
         simStartRT = performance.now();
         simStartTs = t0;
         idx = 0;
-        // do not auto-resume rotate here—user intent stays respected
+        setSelected(null);
+      };
+
+      const fmtClock = (ms: number) => {
+        const d = new Date(ms);
+        const hh = String(d.getUTCHours()).padStart(2, "0");
+        const mm = String(d.getUTCMinutes()).padStart(2, "0");
+        return `${targetDateISO}  ${hh}:${mm} UTC`;
+        // If you want seconds too: `${hh}:${mm}:${String(d.getUTCSeconds()).padStart(2,"0")} UTC`
       };
 
       const tick = () => {
@@ -232,18 +252,26 @@ export default function LiveGlobe({
         const rtNow = performance.now();
         const simNow = simStartTs + (rtNow - simStartRT) * (simMsPerSec / 1000);
 
-        // append any new detections whose ts <= simNow
+        // update HUD clock (clamp to day)
+        const shown = Math.min(simNow, t1);
+        setSimClock(fmtClock(shown));
+
+        // append points whose time has arrived
         while (idx < all.length && all[idx].ts <= simNow) {
+          const newPoint = all[idx];
           displayed.push(all[idx]);
           idx++;
+
+          setNotif(`New ship detected at ${new Date(newPoint.ts).toUTCString()}`);
+
         }
 
-        // rebind data so rings/objects/dots get the new ones
+        // rebind
         globe.pointsData(displayed);
         globe.ringsData(displayed);
         globe.objectsData(displayed);
 
-        if (simNow >= t1) restart();
+        if (simNow >= t1) restart(); // loop the same day
         timerRef.current = requestAnimationFrame(tick);
       };
 
@@ -263,13 +291,13 @@ export default function LiveGlobe({
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geojsonUrl, simHoursPerSec]);
+  }, [geojsonUrl, simMsPerSec, targetDateISO]);
 
   const fmt = (n?: number, digits = 3) => (typeof n === "number" ? n.toFixed(digits) : "—");
 
   const closePanel = () => {
     setSelected(null);
-    if (controlsRef.current) controlsRef.current.autoRotate = true; // resume spin when closing
+    if (controlsRef.current) controlsRef.current.autoRotate = true; // resume spin on close
   };
 
   return (
@@ -279,6 +307,29 @@ export default function LiveGlobe({
         aria-busy={!loaded}
         style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "auto" }}
       />
+      {/* Simulated clock HUD */}
+      <div
+        style={{
+          position: "fixed",
+          left: 16,
+          top: 16,
+          padding: "8px 10px",
+          background: "rgba(0,0,0,0.55)",
+          color: "#e8f6ff",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          borderRadius: 10,
+          fontSize: 14,
+          letterSpacing: 0.5,
+          zIndex: 40,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+          backdropFilter: "blur(3px)"
+        }}
+      >
+        {simClock}
+      </div>
+
+      <Notifier message={notif} />
+
       {selected && (
         <div
           style={{
@@ -306,8 +357,8 @@ export default function LiveGlobe({
             </button>
           </div>
           <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5 }}>
-            <div><b>MMSI:</b> {selected.mmsi ?? "—"}</div>
-            <div><b>Time (UTC):</b> {new Date(selected.ts).toISOString()}</div>
+            <div><b>MMSI:</b> {selected.mmsi ?? "??"}</div>
+            <div><b>Time (UTC):</b> {new Date(selected.ts).toISOString().replace("T"," ").replace(".000Z","Z")}</div>
             <div><b>Confidence:</b> {typeof selected.conf === "number" ? selected.conf.toFixed(2) : "—"}</div>
             <div><b>Lat/Lon:</b> {fmt(selected.lat)}, {fmt(selected.lng)}</div>
           </div>
