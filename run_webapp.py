@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Startup script for the SAR Vessel Detection Web Application
+Minimal startup script for the SAR Vessel Detection Backend
 
-This script ensures all dependencies are installed and starts the Flask web app.
+This script starts a minimal Flask backend that serves only the map and APIs.
 """
 
 import sys
@@ -37,13 +37,13 @@ def check_data_files():
             print(f"  - {file}")
         print("\nTo generate detection data, run:")
         print("  python -m sar_app.cli --image <your_sar_image.tif> --out myoutput")
-        print("\nThe web app will still work but won't show any detections until data is available.")
+        print("\nThe backend will serve empty data until files are available.")
     else:
         print("✓ Detection data files found")
 
 def create_directories():
     """Create necessary directories if they don't exist."""
-    directories = ["uploads", "static/css", "static/js", "templates"]
+    directories = ["uploads", "myoutput"]
     
     for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
@@ -52,7 +52,7 @@ def create_directories():
 
 def main():
     """Main startup routine."""
-    print("🚀 Starting SAR Vessel Detection Web Application")
+    print("🚀 Starting Minimal SAR Detection Backend")
     print("=" * 50)
     
     # Check Python version
@@ -72,8 +72,10 @@ def main():
     check_data_files()
     
     print("\n" + "=" * 50)
-    print("🌐 Starting web server...")
-    print("📍 Open your browser to: http://localhost:5000")
+    print("🌐 Starting minimal backend server...")
+    print("📍 Backend API: http://localhost:5000")
+    print("📍 Map only view: http://localhost:5000")
+    print("📍 Frontend UI: http://localhost:3000")
     print("🛑 Press Ctrl+C to stop the server")
     print("=" * 50)
     
@@ -82,7 +84,7 @@ def main():
         from app import app
         app.run(debug=True, host='0.0.0.0', port=5000)
     except KeyboardInterrupt:
-        print("\n👋 Server stopped by user")
+        print("\n👋 Backend server stopped")
     except Exception as e:
         print(f"❌ Error starting server: {e}")
         sys.exit(1)
