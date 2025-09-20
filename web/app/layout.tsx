@@ -4,6 +4,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Arctic Overwatch',
   description: 'SAR Vessel Detection System',
+  icons: {
+    icon: "/Assets/Logo.png",  
+  }
 }
 
 export default function RootLayout({

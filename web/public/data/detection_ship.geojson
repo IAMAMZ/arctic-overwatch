@@ -1,0 +1,347 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-92.06903447534172, 76.69803363373542] },
+      "properties": {
+        "id": 0,
+        "row": 1869.993425695669,
+        "col": 6832.993458121988,
+        "area_pixels": 9,
+        "intensity_db": 24.36162757873535,
+        "x": -1059612.3749851866,
+        "y": -985720.2958647669,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T00:00:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.13754362144215, 75.706451353618] },
+      "properties": {
+        "id": 1,
+        "row": 3188.99360717753,
+        "col": 4350.001505631152,
+        "area_pixels": 9,
+        "intensity_db": 21.105897903442383,
+        "x": -1158932.05308482,
+        "y": -1038480.3031240414,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T01:20:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.15542162129911, 75.450214319538] },
+      "properties": {
+        "id": 2,
+        "row": 3649.999895470663,
+        "col": 3817.0042893287828,
+        "area_pixels": 9,
+        "intensity_db": 22.671716690063477,
+        "x": -1180251.9417369147,
+        "y": -1056920.5546557668,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T02:40:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-88.71300123521021, 76.44015611129055] },
+      "properties": {
+        "id": 3,
+        "row": 3889.9979983248727,
+        "col": 7831.9972984990045,
+        "area_pixels": 9,
+        "intensity_db": 23.69215965270996,
+        "x": -1019652.2213701059,
+        "y": -1066520.4787699352,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T04:00:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-89.71148466416922, 75.9271409723197] },
+      "properties": {
+        "id": 4,
+        "row": 4442.999911688195,
+        "col": 6380.012735087573,
+        "area_pixels": 9,
+        "intensity_db": 27.050079345703125,
+        "x": -1077731.603906563,
+        "y": -1088640.5553044681,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T05:20:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-94.13359397430197, 74.61052385666149] },
+      "properties": {
+        "id": 5,
+        "row": 4654.992222013349,
+        "col": 1622.006946757515,
+        "area_pixels": 9,
+        "intensity_db": 23.010299682617188,
+        "x": -1268051.8354397654,
+        "y": -1097120.2477174741,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T06:40:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-87.51436883964053, 76.31384740571895] },
+      "properties": {
+        "id": 6,
+        "row": 4672.998715326393,
+        "col": 8161.000479698208,
+        "area_pixels": 9,
+        "intensity_db": 24.785663604736328,
+        "x": -1006492.0941221376,
+        "y": -1097840.507449996,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T08:00:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-94.21723474853891, 74.52090989522021] },
+      "properties": {
+        "id": 7,
+        "row": 4770.00403031537,
+        "col": 1394.9978398697356,
+        "area_pixels": 9,
+        "intensity_db": 22.455127716064453,
+        "x": -1277132.1997152767,
+        "y": -1101720.720049555,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T09:20:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.71571542627575, 74.63278686092822] },
+      "properties": {
+        "id": 8,
+        "row": 4844.992768337103,
+        "col": 1868.989778735777,
+        "area_pixels": 9,
+        "intensity_db": 22.9885311126709,
+        "x": -1258172.5221606349,
+        "y": -1104720.2695704242,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T10:40:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.33844487889051, 74.49168481408853] },
+      "properties": {
+        "id": 9,
+        "row": 5310.000400741071,
+        "col": 1761.0054149278615,
+        "area_pixels": 9,
+        "intensity_db": 20.530784606933594,
+        "x": -1262491.8967129516,
+        "y": -1123320.574866583,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T12:00:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-86.07675117576099, 76.2126977885342] },
+      "properties": {
+        "id": 10,
+        "row": 5505.018852614167,
+        "col": 8675.001726710932,
+        "area_pixels": 9,
+        "intensity_db": 24.608978271484375,
+        "x": -985932.0442416287,
+        "y": -1131121.312941507,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T13:20:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-85.8112802825152, 76.1746517164173] },
+      "properties": {
+        "id": 11,
+        "row": 5698.0004987694165,
+        "col": 8737.999022786456,
+        "area_pixels": 9,
+        "intensity_db": 23.783979415893555,
+        "x": -983412.1523986078,
+        "y": -1138840.5787877168,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T14:40:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-81.18318407683427, 76.28604075810753] },
+      "properties": {
+        "id": 12,
+        "row": 7342.011408414831,
+        "col": 11296.00625627381,
+        "area_pixels": 9,
+        "intensity_db": 28.56728744506836,
+        "x": -881091.8630591137,
+        "y": -1204601.0151735335,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T16:00:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.09580638334, 76.1229754182179] },
+      "properties": {
+        "id": 13,
+        "row": 8121.002730491997,
+        "col": 11614.00217903079,
+        "area_pixels": 9,
+        "intensity_db": 25.365583419799805,
+        "x": -868372.0261488345,
+        "y": -1235760.66805662,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T17:20:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-79.96332228565606, 76.11058453817425] },
+      "properties": {
+        "id": 14,
+        "row": 8199.009897835556,
+        "col": 11665.992473636545,
+        "area_pixels": 9,
+        "intensity_db": 27.36396598815918,
+        "x": -866292.4143646043,
+        "y": -1238880.9547503623,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T18:40:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-87.64767212865723, 74.32022163067776] },
+      "properties": {
+        "id": 15,
+        "row": 8648.992486038047,
+        "col": 4380.998848744673,
+        "area_pixels": 9,
+        "intensity_db": 22.1484375,
+        "x": -1157692.159360279,
+        "y": -1256880.258278462,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T20:00:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-87.23228003487431, 74.2222741583103] },
+      "properties": {
+        "id": 16,
+        "row": 9057.99830311671,
+        "col": 4428.008765103981,
+        "area_pixels": 9,
+        "intensity_db": 23.010299682617188,
+        "x": -1155811.7627059068,
+        "y": -1273240.4909616085,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T21:20:00Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-79.97438206152565, 74.7489016402136] },
+      "properties": {
+        "id": 17,
+        "row": 11263.995738163378,
+        "col": 9513.005004179086,
+        "area_pixels": 9,
+        "intensity_db": 29.800033569335938,
+        "x": -952411.9131429027,
+        "y": -1361480.3883634754,
+        "has_ais_match": false,
+        "nearest_mmsi": "",
+        "nearest_distance_m": null,
+        "nearest_time_delta_s": null,
+        "ais_timestamp": null,
+        "timestamp": "2025-07-22T22:40:00Z"
+      }
+    }
+  ]
+}
