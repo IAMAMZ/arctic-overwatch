@@ -70,7 +70,7 @@ export default function LiveGlobe({
       globe.scene().add(new THREE.AmbientLight(0xffffff, 1.0));
 
       // Zoom-aware dot radius (smaller when zooming in)
-      const BASE_ALT = 1.8;
+      const BASE_ALT = 1;
       const BASE_RADIUS = 0.1;
       const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
       let currAlt = BASE_ALT;
