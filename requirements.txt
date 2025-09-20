@@ -1,0 +1,11 @@
+numpy>=1.26
+scipy>=1.11
+pandas>=2.1
+rasterio>=1.4.1
+shapely>=2.0
+pyproj>=3.6
+flask>=3.0.0
+flask-cors>=4.0.0
+requests>=2.31.0
+gunicorn>=21.2.0
+

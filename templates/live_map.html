@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arctic Overwatch - Live Maritime Surveillance</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 2px solid #00d4ff;
+        }
+        
+        .control-panel {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid #00d4ff;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .time-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #cccccc;
+            margin-top: 5px;
+        }
+        
+        #map {
+            height: 70vh;
+            border-radius: 15px;
+            border: 2px solid #00d4ff;
+        }
+        
+        .detection-card {
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .detection-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+        
+        .detection-card.matched {
+            border-left: 4px solid #28a745;
+        }
+        
+        .detection-card.unmatched {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .detection-card.dark-vessel {
+            border-left: 4px solid #ffc107;
+        }
+        
+        .playback-controls {
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .timeline {
+            background: #1a1a2e;
+            height: 4px;
+            border-radius: 2px;
+            margin: 10px 0;
+            position: relative;
+        }
+        
+        .timeline-progress {
+            background: linear-gradient(90deg, #00d4ff, #0099cc);
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.1s ease;
+        }
+        
+        .vessel-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .vessel-icon.matched { background-color: #28a745; }
+        .vessel-icon.unmatched { background-color: #dc3545; }
+        .vessel-icon.dark-vessel { background-color: #ffc107; }
+        
+        .detection-list {
+            max-height: 400px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #00d4ff #1a1a2e;
+        }
+        
+        .detection-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .detection-list::-webkit-scrollbar-track {
+            background: #1a1a2e;
+            border-radius: 3px;
+        }
+        
+        .detection-list::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-satellite"></i>
+                Arctic Overwatch - Live Maritime Surveillance
+            </span>
+            <span class="navbar-text">
+                <i class="fas fa-clock"></i>
+                <span id="current-time">Loading...</span>
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Control Panel -->
+            <div class="col-12 mb-4">
+                <div class="control-panel">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="time-display" id="time-display">
+                                2023-01-01 00:00:00
+                            </div>
+                            
+                            <div class="playback-controls">
+                                <div class="row align-items-center">
+                                    <div class="col-md-2">
+                                        <button class="btn btn-outline-primary" id="play-pause-btn">
+                                            <i class="fas fa-play"></i>
+                                        </button>
+                                        <button class="btn btn-outline-secondary ms-2" id="reset-btn">
+                                            <i class="fas fa-undo"></i>
+                                        </button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="timeline">
+                                            <div class="timeline-progress" id="timeline-progress"></div>
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-1">
+                                            <small id="start-time">2023-01-01</small>
+                                            <small id="end-time">2023-12-31</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Speed:</label>
+                                        <select class="form-select form-select-sm" id="speed-select">
+                                            <option value="1">1x</option>
+                                            <option value="2" selected>2x</option>
+                                            <option value="5">5x</option>
+                                            <option value="10">10x</option>
+                                            <option value="30">30x</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Filter:</label>
+                                        <select class="form-select form-select-sm" id="filter-select">
+                                            <option value="all">All Vessels</option>
+                                            <option value="matched">AIS Matched</option>
+                                            <option value="unmatched">No AIS</option>
+                                            <option value="dark">Dark Vessels</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="total-detections">0</div>
+                                    <div class="stat-label">Total Detections</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="ais-matches">0</div>
+                                    <div class="stat-label">AIS Matches</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="dark-vessels">0</div>
+                                    <div class="stat-label">Dark Vessels</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="active-vessels">0</div>
+                                    <div class="stat-label">Active Now</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map and Detection List -->
+            <div class="col-lg-8">
+                <div id="map"></div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="control-panel">
+                    <h5><i class="fas fa-list"></i> Recent Detections</h5>
+                    <div class="detection-list" id="detection-list">
+                        <p class="text-center text-muted">Loading detections...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detection Modal -->
+    <div class="modal fade" id="detectionModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Vessel Detection Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modal-body">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/live_map.js') }}"></script>
+</body>
+</html>
