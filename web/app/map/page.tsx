@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, Ship, Eye, Zap } from "lucide-react";
+import { BarChart3, Ship, Eye, Zap, MessageSquare } from "lucide-react";
+import GeminiChat from "@/components/GeminiChat";
 
 type Stats = {
   total_detections: number;
@@ -10,13 +11,15 @@ type Stats = {
   avg_intensity: number;
 };
 
-export default function Home() {
+export default function MapPage() {
   const [stats, setStats] = useState<Stats>({
     total_detections: 0,
     ais_matches: 0,
     dark_vessels: 0,
     avg_intensity: 0,
   });
+
+  const [openChat, setOpenChat] = useState(true);
 
   useEffect(() => {
     async function loadStats() {
@@ -46,9 +49,18 @@ export default function Home() {
             <p className="text-sm text-gray-400">SAR Vessel Detection System</p>
           </div>
         </div>
+
+        {/* Chat toggle (desktop also has panel visible by default) */}
+        <button
+          onClick={() => setOpenChat((s) => !s)}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+        >
+          <MessageSquare className="h-4 w-4" />
+          {openChat ? "Hide" : "Chat"}
+        </button>
       </header>
 
-      {/* Stats section */}
+      {/* Stats */}
       <section className="grid grid-cols-4 gap-6 p-6 bg-gray-800/40 border-b border-gray-700">
         <StatCard
           label="Total Detections"
@@ -76,13 +88,31 @@ export default function Home() {
         />
       </section>
 
-      {/* Map from backend */}
+      {/* Map + Chat */}
       <main className="flex-1 relative">
+        {/* Backend map in iframe (unchanged) */}
         <iframe
           src="http://localhost:5000/"
           className="absolute inset-0 w-full h-full border-none"
           title="Detection Map"
         />
+
+        {/* Chat Panel (overlay) */}
+        <div
+          className={`absolute right-4 top-4 bottom-4 transition-all duration-300 ${
+            openChat ? "w-[440px] opacity-100" : "w-0 opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="flex h-full w-[440px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-gray-950/90 backdrop-blur-md shadow-2xl">
+            <div className="border-b border-white/10 px-5 py-3 text-sm text-white/70">
+              Analyst (Gemini)
+              <span className="ml-2 text-xs text-white/40">
+                Type <code className="rounded bg-white/10 px-1">analyze REGION</code>
+              </span>
+            </div>
+            <GeminiChat />
+          </div>
+        </div>
       </main>
     </div>
   );
@@ -105,9 +135,7 @@ function StatCard({
       className={`rounded-xl p-5 border bg-gradient-to-br ${color} flex flex-col space-y-3`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400 uppercase tracking-wider">
-          {label}
-        </span>
+        <span className="text-xs text-gray-400 uppercase tracking-wider">{label}</span>
         {icon}
       </div>
       <div className="text-3xl font-bold">{value}</div>
