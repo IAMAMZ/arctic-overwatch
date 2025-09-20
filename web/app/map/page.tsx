@@ -10,6 +10,8 @@ import {
   Volume2,
   VolumeX,
   Send,
+  X,
+  Camera,
 } from "lucide-react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -48,6 +50,15 @@ export default function MapPage() {
   const [input, setInput] = useState("");
   const [recording, setRecording] = useState(false);
   const [speaking, setSpeaking] = useState(true);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string>("");
+  const [selectedShipData, setSelectedShipData] = useState<{
+    mmsi: string;
+    lat: number;
+    lng: number;
+    confidence: number;
+    timestamp: string;
+  } | null>(null);
 
   // Speech APIs
   const recognitionRef = useRef<any>(null);
@@ -160,6 +171,30 @@ export default function MapPage() {
     });
   };
 
+  /* ---------------- Ship Image Modal ---------------- */
+  const wakeImages = ["A.jpg", "B.jpg", "C.jpg", "D.jpg", "E.jpg", "F.jpg", "G.jpg", "H.jpg"];
+  
+  const openShipImageModal = (shipData?: any) => {
+    const randomImage = wakeImages[Math.floor(Math.random() * wakeImages.length)];
+    const mockShipData = shipData || {
+      mmsi: `ARV-${Math.floor(Math.random() * 9000) + 1000}`,
+      lat: 70.5 + (Math.random() - 0.5) * 10,
+      lng: -85.3 + (Math.random() - 0.5) * 20,
+      confidence: 0.65 + Math.random() * 0.3,
+      timestamp: new Date(Date.now() - Math.random() * 86400000).toISOString()
+    };
+    
+    setSelectedImage(`/wake/${randomImage}`);
+    setSelectedShipData(mockShipData);
+    setShowImageModal(true);
+  };
+
+  const closeImageModal = () => {
+    setShowImageModal(false);
+    setSelectedImage("");
+    setSelectedShipData(null);
+  };
+
   /* ---------------- Chat send ---------------- */
   const handleSend = async () => {
     const text = input.trim();
@@ -266,19 +301,30 @@ Answer with highly specific and accurate knowledge (operational tone).`;
             </div>
           </div>
 
-          <button
-            onClick={toggleSpeaking}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-          >
-            {speaking ? (
-              <Volume2 className="h-4 w-4 text-emerald-400" />
-            ) : (
-              <VolumeX className="h-4 w-4 text-rose-400" />
-            )}
-            <span className="text-white/80">
-              {speaking ? "Voice On" : "Muted"}
-            </span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => openShipImageModal()}
+              className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-600/20 px-3 py-2 text-sm hover:bg-cyan-600/30 transition-colors"
+              title="Demo: Ship Wake Image"
+            >
+              <Camera className="h-4 w-4 text-cyan-400" />
+              <span className="text-cyan-300">Ship Demo</span>
+            </button>
+            
+            <button
+              onClick={toggleSpeaking}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+            >
+              {speaking ? (
+                <Volume2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <VolumeX className="h-4 w-4 text-rose-400" />
+              )}
+              <span className="text-white/80">
+                {speaking ? "Voice On" : "Muted"}
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -395,6 +441,116 @@ Answer with highly specific and accurate knowledge (operational tone).`;
           </div>
         </aside>
       </div>
+
+      {/* Ship Wake Image Modal */}
+      {showImageModal && selectedShipData && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && closeImageModal()}
+        >
+          <div className="relative max-w-4xl w-full mx-4 bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-white/10 bg-gradient-to-r from-cyan-700/30 to-indigo-700/30">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-r from-cyan-600 to-indigo-600">
+                  <Ship className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Ship Detection</h2>
+                  <p className="text-sm text-white/70">SAR Wake Analysis</p>
+                </div>
+              </div>
+              <button
+                onClick={closeImageModal}
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-[1fr_320px] gap-0">
+              {/* Image Section */}
+              <div className="relative bg-black/20">
+                <img
+                  src={selectedImage}
+                  alt="Ship Wake Detection"
+                  className="w-full h-[400px] md:h-[500px] object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md rounded-lg px-3 py-2">
+                  <div className="text-xs text-white/70 uppercase tracking-wide">SAR Wake Pattern</div>
+                  <div className="text-sm font-medium text-white">High Resolution Analysis</div>
+                </div>
+              </div>
+
+              {/* Ship Data Panel */}
+              <div className="p-6 space-y-6 bg-gradient-to-b from-slate-900/50 to-slate-950/50">
+                <div>
+                  <h3 className="text-sm font-medium text-white/70 uppercase tracking-wide mb-3">Vessel Information</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-white/5 border border-white/10">
+                      <span className="text-sm text-white/70">MMSI</span>
+                      <span className="text-sm font-mono text-white">{selectedShipData.mmsi}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-white/5 border border-white/10">
+                      <span className="text-sm text-white/70">Confidence</span>
+                      <span className={`text-sm font-semibold ${selectedShipData.confidence > 0.8 ? 'text-emerald-400' : selectedShipData.confidence > 0.6 ? 'text-yellow-400' : 'text-rose-400'}`}>
+                        {(selectedShipData.confidence * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-white/5 border border-white/10">
+                      <span className="text-sm text-white/70">Position</span>
+                      <span className="text-sm font-mono text-white">{selectedShipData.lat.toFixed(3)}, {selectedShipData.lng.toFixed(3)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-white/5 border border-white/10">
+                      <span className="text-sm text-white/70">Timestamp</span>
+                      <span className="text-xs font-mono text-white">{new Date(selectedShipData.timestamp).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-white/70 uppercase tracking-wide mb-3">Analysis</h3>
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-cyan-600/10 border border-cyan-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
+                        <span className="text-sm font-medium text-cyan-300">Wake Detected</span>
+                      </div>
+                      <p className="text-xs text-white/70">Clear wake pattern visible in SAR imagery indicating vessel movement through Arctic waters.</p>
+                    </div>
+                    
+                    {selectedShipData.confidence < 0.7 && (
+                      <div className="p-3 rounded-lg bg-yellow-600/10 border border-yellow-500/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                          <span className="text-sm font-medium text-yellow-300">Low Confidence</span>
+                        </div>
+                        <p className="text-xs text-white/70">Detection confidence below threshold. Manual verification recommended.</p>
+                      </div>
+                    )}
+
+                    <div className="p-3 rounded-lg bg-indigo-600/10 border border-indigo-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
+                        <span className="text-sm font-medium text-indigo-300">Arctic Zone</span>
+                      </div>
+                      <p className="text-xs text-white/70">Vessel operating in monitored Arctic waters. Enhanced surveillance active.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={closeImageModal}
+                  className="w-full rounded-lg bg-gradient-to-r from-cyan-600 to-indigo-600 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-cyan-900/20 hover:brightness-110 transition-all"
+                >
+                  Close Analysis
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,123 @@
+{
+  "experiment_name": "arctic_ship_detection_v2.1",
+  "description": "Advanced CNN for ship detection in Arctic SAR imagery",
+  
+  "model": {
+    "model_type": "advanced",
+    "backbone": "resnet50",
+    "input_channels": 1,
+    "num_classes": 2,
+    "pretrained": true,
+    "freeze_backbone": false,
+    "input_size": [224, 224]
+  },
+  
+  "data": {
+    "train_data_dir": "./data/train/images",
+    "val_data_dir": "./data/val/images", 
+    "test_data_dir": "./data/test/images",
+    "train_annotations": "./data/train/annotations.json",
+    "val_annotations": "./data/val/annotations.json",
+    "test_annotations": "./data/test/annotations.json",
+    "batch_size": 32,
+    "num_workers": 4,
+    "pin_memory": true,
+    "class_weights": [0.3, 1.7],
+    "negative_ratio": 0.3,
+    "min_ship_size": 5
+  },
+  
+  "training": {
+    "epochs": 150,
+    "optimizer": "adamw",
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "scheduler": "warmup_cosine",
+    "warmup_epochs": 10,
+    "min_lr": 1e-6,
+    "gradient_clipping": 1.0,
+    "use_amp": true,
+    "accumulate_grad_batches": 1
+  },
+  
+  "loss": {
+    "classification_weight": 0.7,
+    "confidence_weight": 0.2,
+    "size_weight": 0.1,
+    "focal_loss_alpha": 1.0,
+    "focal_loss_gamma": 2.0
+  },
+  
+  "early_stopping": {
+    "patience": 20,
+    "min_delta": 0.001,
+    "monitor_metric": "val_loss",
+    "mode": "min",
+    "restore_best_weights": true
+  },
+  
+  "checkpointing": {
+    "checkpoint_dir": "./checkpoints",
+    "save_best_only": false,
+    "max_checkpoints": 5,
+    "save_frequency": 5
+  },
+  
+  "logging": {
+    "log_dir": "./logs",
+    "use_tensorboard": true,
+    "use_wandb": false,
+    "wandb_project": "arctic-overwatch-ml",
+    "log_frequency": 100
+  },
+  
+  "evaluation": {
+    "detection_threshold": 0.5,
+    "iou_thresholds": [0.5, 0.75, 0.9],
+    "confidence_threshold": 0.8,
+    "nms_threshold": 0.4
+  },
+  
+  "augmentation": {
+    "horizontal_flip_prob": 0.5,
+    "vertical_flip_prob": 0.3,
+    "rotation_limit": 30,
+    "brightness_contrast_prob": 0.7,
+    "gaussian_noise_prob": 0.3,
+    "gaussian_blur_prob": 0.2,
+    "elastic_transform_prob": 0.3,
+    "grid_distortion_prob": 0.2
+  },
+  
+  "preprocessing": {
+    "normalize_db": true,
+    "denoise_method": "bilateral",
+    "enhance_contrast": true,
+    "remove_sea_ice": true,
+    "multi_scale_training": true,
+    "target_scales": [224, 256, 288, 320]
+  },
+  
+  "hardware": {
+    "device": "auto",
+    "mixed_precision": true,
+    "dataloader_num_workers": 4,
+    "pin_memory": true,
+    "non_blocking": true
+  },
+  
+  "paths": {
+    "output_dir": "./outputs",
+    "model_save_path": "./models/ship_detector.pth",
+    "results_save_path": "./results",
+    "plots_save_path": "./plots"
+  },
+  
+  "debug": {
+    "debug_mode": false,
+    "profile_training": false,
+    "save_intermediate_outputs": false,
+    "visualize_predictions": true,
+    "max_debug_batches": 10
+  }
+}

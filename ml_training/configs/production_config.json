@@ -1,0 +1,138 @@
+{
+  "experiment_name": "arctic_ship_detection_production",
+  "description": "Production-ready ship detection model for Arctic Overwatch deployment",
+  
+  "model": {
+    "model_type": "advanced",
+    "backbone": "efficientnet_b4",
+    "input_channels": 1,
+    "num_classes": 2,
+    "pretrained": true,
+    "freeze_backbone": false,
+    "input_size": [380, 380]
+  },
+  
+  "data": {
+    "train_data_dir": "/data/arctic_sar/train/images",
+    "val_data_dir": "/data/arctic_sar/val/images",
+    "test_data_dir": "/data/arctic_sar/test/images",
+    "train_annotations": "/data/arctic_sar/train/coco_annotations.json",
+    "val_annotations": "/data/arctic_sar/val/coco_annotations.json",
+    "test_annotations": "/data/arctic_sar/test/coco_annotations.json",
+    "batch_size": 16,
+    "num_workers": 8,
+    "pin_memory": true,
+    "class_weights": [0.25, 1.75],
+    "negative_ratio": 0.4,
+    "min_ship_size": 3
+  },
+  
+  "training": {
+    "epochs": 200,
+    "optimizer": "adamw",
+    "learning_rate": 0.0005,
+    "weight_decay": 0.0001,
+    "scheduler": "cosine",
+    "warmup_epochs": 15,
+    "min_lr": 1e-7,
+    "gradient_clipping": 0.5,
+    "use_amp": true,
+    "accumulate_grad_batches": 2
+  },
+  
+  "loss": {
+    "classification_weight": 0.6,
+    "confidence_weight": 0.25,
+    "size_weight": 0.15,
+    "focal_loss_alpha": 1.0,
+    "focal_loss_gamma": 2.5
+  },
+  
+  "early_stopping": {
+    "patience": 25,
+    "min_delta": 0.0005,
+    "monitor_metric": "val_mAP",
+    "mode": "max",
+    "restore_best_weights": true
+  },
+  
+  "checkpointing": {
+    "checkpoint_dir": "/checkpoints/arctic_overwatch",
+    "save_best_only": false,
+    "max_checkpoints": 10,
+    "save_frequency": 3
+  },
+  
+  "logging": {
+    "log_dir": "/logs/arctic_overwatch",
+    "use_tensorboard": true,
+    "use_wandb": true,
+    "wandb_project": "arctic-overwatch-production",
+    "log_frequency": 50
+  },
+  
+  "evaluation": {
+    "detection_threshold": 0.6,
+    "iou_thresholds": [0.5, 0.6, 0.7, 0.8, 0.9],
+    "confidence_threshold": 0.85,
+    "nms_threshold": 0.3
+  },
+  
+  "augmentation": {
+    "horizontal_flip_prob": 0.6,
+    "vertical_flip_prob": 0.4,
+    "rotation_limit": 45,
+    "brightness_contrast_prob": 0.8,
+    "gaussian_noise_prob": 0.4,
+    "gaussian_blur_prob": 0.3,
+    "elastic_transform_prob": 0.4,
+    "grid_distortion_prob": 0.3
+  },
+  
+  "preprocessing": {
+    "normalize_db": true,
+    "denoise_method": "nlm",
+    "enhance_contrast": true,
+    "remove_sea_ice": true,
+    "multi_scale_training": true,
+    "target_scales": [320, 380, 416, 480]
+  },
+  
+  "hardware": {
+    "device": "cuda",
+    "mixed_precision": true,
+    "dataloader_num_workers": 8,
+    "pin_memory": true,
+    "non_blocking": true
+  },
+  
+  "paths": {
+    "output_dir": "/outputs/arctic_overwatch",
+    "model_save_path": "/models/arctic_ship_detector_v2.1.pth",
+    "results_save_path": "/results/arctic_overwatch",
+    "plots_save_path": "/plots/arctic_overwatch"
+  },
+  
+  "debug": {
+    "debug_mode": false,
+    "profile_training": true,
+    "save_intermediate_outputs": false,
+    "visualize_predictions": false,
+    "max_debug_batches": 5
+  },
+  
+  "deployment": {
+    "model_optimization": {
+      "quantization": true,
+      "pruning": false,
+      "onnx_export": true,
+      "tensorrt_optimization": true
+    },
+    "inference": {
+      "batch_size": 1,
+      "max_batch_size": 8,
+      "precision": "fp16",
+      "max_memory_gb": 4
+    }
+  }
+}
