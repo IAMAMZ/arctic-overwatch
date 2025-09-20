@@ -18,9 +18,9 @@ type GJFeature = {
 type GJ = { type: "FeatureCollection"; features: GJFeature[] };
 
 export default function LiveGlobe({
-  geojsonUrl = "/data/year_ships_water.geojson", // <-- fetches from /public/data/
+  geojsonUrl = "/data/year_ships_water.geojson",
   simHoursPerSec = 24,
-  pointSize = 0.7,
+  pointSize = 0.9
 }: {
   geojsonUrl?: string;
   simHoursPerSec?: number;
@@ -29,7 +29,9 @@ export default function LiveGlobe({
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
+
   const [loaded, setLoaded] = useState(false);
+  const [selected, setSelected] = useState<ShipPoint | null>(null);
 
   useEffect(() => {
     let isAlive = true;
@@ -45,22 +47,33 @@ export default function LiveGlobe({
           ? GlobeModule()(containerRef.current)
           : new (GlobeModule as any)(containerRef.current);
 
+      globe.enablePointerInteraction(true);
+
       globe
         .globeTileEngineUrl((x: number, y: number, l: number) =>
           `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`
         )
-      
-        .pointsMerge(true)
-        .pointAltitude(0.01)
+        // IMPORTANT: disable merge so hover/click work
+        .pointsMerge(false)
+        .pointAltitude(0.02)
         .pointRadius(pointSize)
-        .pointColor((d: ShipPoint) =>
-          d.conf && d.conf < 0.5 ? "#00ff88" : "#ff3355"
-        )
+        .pointResolution(16) // smoother hit area
+        .pointColor((d: ShipPoint) => (d.conf && d.conf < 0.5 ? "#00ff88" : "#ff3355"))
         .pointLabel((d: ShipPoint) => {
           const t = new Date(d.ts).toISOString();
           return `<div><b>MMSI:</b> ${d.mmsi ?? "—"}<br/><b>Time (UTC):</b> ${t}<br/><b>Conf:</b> ${d.conf ?? "—"}</div>`;
         })
-        .pointsTransitionDuration(300);
+        .pointsTransitionDuration(300)
+        .showPointerCursor(true) // built-in cursor helper
+        .onPointHover((d: ShipPoint | null) => {
+          if (!containerRef.current) return;
+          containerRef.current.style.cursor = d ? "pointer" : "grab";
+        })
+        .onPointClick((d: ShipPoint, _evt: MouseEvent, coords: { lat: number; lng: number; altitude: number }) => {
+          console.log("Clicked:", d, coords);
+          setSelected(d);
+          globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.9 }, 900);
+        });
 
       globeRef.current = globe;
 
@@ -72,12 +85,10 @@ export default function LiveGlobe({
       resize();
       window.addEventListener("resize", resize);
 
-      // --------- Fetch GeoJSON ---------
-      const url = `${geojsonUrl}?t=${Date.now()}`;
-      const res = await fetch(url, { cache: "no-store" });
+      // fetch data
+      const res = await fetch(`${geojsonUrl}?t=${Date.now()}`, { cache: "no-store" });
       const gj: GJ = await res.json();
       if (!gj?.features) throw new Error("GeoJSON missing features array");
-      // ---------------------------------
 
       const all: ShipPoint[] = gj.features
         .filter(f => f.geometry?.type === "Point")
@@ -113,6 +124,7 @@ export default function LiveGlobe({
         simStartRT = performance.now();
         simStartTs = t0;
         idx = 0;
+        setSelected(null);
       };
 
       const tick = () => {
@@ -149,11 +161,49 @@ export default function LiveGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geojsonUrl, simHoursPerSec, pointSize]);
 
+  const fmt = (n?: number, digits = 3) => (typeof n === "number" ? n.toFixed(digits) : "—");
+
   return (
-    <div
-      ref={containerRef}
-      aria-busy={!loaded}
-      style={{ position: "fixed", inset: 0, overflow: "hidden" }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        aria-busy={!loaded}
+        style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "auto" }}
+      />
+      {selected && (
+        <div
+          style={{
+            position: "fixed",
+            right: 16,
+            top: 16,
+            width: 320,
+            background: "rgba(0,0,0,0.72)",
+            color: "#fff",
+            padding: "12px 14px",
+            borderRadius: 12,
+            backdropFilter: "blur(4px)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+            zIndex: 50
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <strong>Ship Detection</strong>
+            <button
+              onClick={() => setSelected(null)}
+              style={{ background: "transparent", color: "#fff", border: "none", cursor: "pointer", fontSize: 18 }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5 }}>
+            <div><b>MMSI:</b> {selected.mmsi ?? "—"}</div>
+            <div><b>Time (UTC):</b> {new Date(selected.ts).toISOString()}</div>
+            <div><b>Confidence:</b> {typeof selected.conf === "number" ? selected.conf.toFixed(2) : "—"}</div>
+            <div><b>Lat/Lon:</b> {fmt(selected.lat)}, {fmt(selected.lng)}</div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
