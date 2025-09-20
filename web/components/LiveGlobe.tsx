@@ -18,7 +18,7 @@ type GJFeature = {
 type GJ = { type: "FeatureCollection"; features: GJFeature[] };
 
 export default function LiveGlobe({
-  geojsonUrl = "/data/year_ships.geojson", // <-- fetches from /public/data/
+  geojsonUrl = "/data/year_ships_water.geojson", // <-- fetches from /public/data/
   simHoursPerSec = 24,
   pointSize = 0.7,
 }: {
@@ -47,8 +47,9 @@ export default function LiveGlobe({
 
       globe
         .globeTileEngineUrl((x: number, y: number, l: number) =>
-          `https://tile.openstreetmap.org/${l}/${x}/${y}.png`
+          `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`
         )
+      
         .pointsMerge(true)
         .pointAltitude(0.01)
         .pointRadius(pointSize)
