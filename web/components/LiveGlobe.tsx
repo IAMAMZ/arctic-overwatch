@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Notifier from "./Notifier";
+
 
 type ShipPoint = {
   lat: number;
@@ -34,6 +36,8 @@ export default function LiveGlobe({
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<ShipPoint | null>(null);
   const [simClock, setSimClock] = useState<string>("--:-- UTC");
+  const [notif, setNotif] = useState<string | null>(null);
+
 
   useEffect(() => {
     let isAlive = true;
@@ -254,8 +258,12 @@ export default function LiveGlobe({
 
         // append points whose time has arrived
         while (idx < all.length && all[idx].ts <= simNow) {
+          const newPoint = all[idx];
           displayed.push(all[idx]);
           idx++;
+
+          setNotif(`New ship detected at ${new Date(newPoint.ts).toUTCString()}`);
+
         }
 
         // rebind
@@ -319,6 +327,8 @@ export default function LiveGlobe({
       >
         {simClock}
       </div>
+
+      <Notifier message={notif} />
 
       {selected && (
         <div
