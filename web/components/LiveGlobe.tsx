@@ -41,12 +41,15 @@ export default function LiveGlobe({
       const mod = await import("globe.gl");
       const GlobeModule: any = (mod as any).default ?? mod;
 
+      // Three for custom objects (glowing spheres + halo sprite)
+      const THREE = await import("three");
+
       const globe =
         typeof GlobeModule === "function" && !GlobeModule.prototype?.constructor
           ? GlobeModule()(containerRef.current)
           : new (GlobeModule as any)(containerRef.current);
 
-      // --- Space background + gentle auto-rotate (will pause on selection) ---
+      // === Space background + auto-rotate (paused on click) ===
       globe
         .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
         .showAtmosphere(true);
@@ -58,25 +61,31 @@ export default function LiveGlobe({
         controlsRef.current = controls;
       }
 
-      // --- Zoom-aware dot radius (smaller when zooming in) ---
+      // Add a bit more ambient light so emissive pops nicely
+      const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+      globe.scene().add(ambient);
+
+      // === Zoom-aware dot radius (smaller when zooming in) ===
       const BASE_ALT = 1.8;    // initial camera altitude
-      const BASE_RADIUS = 0.9; // base angular radius
+      const BASE_RADIUS = 0.9; // base angular radius (tweak to taste)
       const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
       let currAlt = BASE_ALT;
       const scaleFromAlt = (alt: number) => clamp(alt / BASE_ALT, 0.25, 2);
       const radiusAccessor = () => BASE_RADIUS * scaleFromAlt(currAlt);
 
       globe
-        // Optional surface detail under the starfield
+        // Optional surface: satellite tiles under the starfield
         .globeTileEngineUrl((x: number, y: number, l: number) =>
           `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`
         )
-        // Points layer (merge=false so hover/click work)
-        .pointsMerge(false)
+        // Points layer (kept for hover/click + the “dot” look)
+        .pointsMerge(false)          // needed for hover/click
         .pointAltitude(0.02)
-        .pointRadius(radiusAccessor)
-        .pointResolution(16)
-        .pointColor((d: ShipPoint) => (d.conf && d.conf < 0.5 ? "#00ff88" : "#ff3355"))
+        .pointRadius(radiusAccessor) // zoom-aware
+        .pointResolution(20)
+        .pointColor((d: ShipPoint) =>
+          d.conf && d.conf < 0.5 ? "rgba(0,255,170,0.95)" : "rgba(255,60,100,0.95)"
+        )
         .pointLabel((d: ShipPoint) => {
           const t = new Date(d.ts).toISOString();
           return `<div><b>MMSI:</b> ${d.mmsi ?? "—"}<br/><b>Time (UTC):</b> ${t}<br/><b>Conf:</b> ${d.conf ?? "—"}</div>`;
@@ -88,13 +97,12 @@ export default function LiveGlobe({
           containerRef.current.style.cursor = d ? "pointer" : "grab";
         })
         .onPointClick((d: ShipPoint) => {
-          setSelected(d);                 // show info
-          if (controlsRef.current) {
-            controlsRef.current.autoRotate = false; // ⛔ stop spin on click
-          }
+          setSelected(d);
+          if (controlsRef.current) controlsRef.current.autoRotate = false; // stop spin on selection
+          // (optional zoom-to)
+          globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.9 }, 700);
         });
 
-      // keep radius in sync with camera zoom
       globe.onZoom(({ altitude }: { lat: number; lng: number; altitude: number }) => {
         currAlt = altitude;
         globe.pointRadius(radiusAccessor).pointsTransitionDuration(0);
@@ -111,13 +119,13 @@ export default function LiveGlobe({
       resize();
       window.addEventListener("resize", resize);
 
-      // ---- Load GeoJSON ----
+      // === Load GeoJSON ===
       const res = await fetch(`${geojsonUrl}?t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to load ${geojsonUrl} (${res.status})`);
       const gj: GJ = await res.json();
       if (!gj?.features) throw new Error("GeoJSON missing features array");
 
-      // Normalize + sort
+      // Normalize + sort by time
       const all: ShipPoint[] = gj.features
         .filter(f => f.geometry?.type === "Point")
         .map(f => {
@@ -135,12 +143,72 @@ export default function LiveGlobe({
         return;
       }
 
-      // ---- Playback of dots over the year ----
+      // === “Techy” visual layer 1: Sonar rings on appearances ===
+      // Use same data array we progressively append to.
+      globe
+        .ringsData([]) // start empty, we’ll keep reassigning
+        .ringColor((d: ShipPoint) =>
+          d.conf && d.conf < 0.5 ? "rgba(0,255,200,0.65)" : "rgba(255,120,160,0.65)"
+        )
+        .ringMaxRadius(10)          // degrees
+        .ringPropagationSpeed(2.3)   // degrees/sec
+        .ringRepeatPeriod(0);        // single ping per point
+
+      // === “Techy” visual layer 2: Glowing spheres (3D objects) at detections ===
+      // Build a small glowing orb + a halo sprite, then clone per point.
+      const buildGlowSprite = () => {
+        const size = 128;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d")!;
+        const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+        g.addColorStop(0.0, "rgba(0,255,220,0.9)");
+        g.addColorStop(0.4, "rgba(0,255,220,0.25)");
+        g.addColorStop(1.0, "rgba(0,255,220,0.0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        const tex = new THREE.Texture(canvas);
+        tex.needsUpdate = true;
+        const material = new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true });
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(0.35, 0.35, 1); // adjust halo size
+        return sprite;
+      };
+
+      const buildShipGlow = (d: ShipPoint) => {
+        const orbGeom = new THREE.SphereGeometry(0.035, 20, 20);
+        const color = d.conf && d.conf < 0.5 ? 0x00ffb0 : 0xff3c64;
+        const mat = new THREE.MeshStandardMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 1.2,
+          metalness: 0.2,
+          roughness: 0.3
+        });
+        const orb = new THREE.Mesh(orbGeom, mat);
+        const halo = buildGlowSprite();
+        const group = new THREE.Group();
+        group.add(orb);
+        group.add(halo);
+        return group;
+      };
+
+      globe
+        .objectsData([]) // start empty; we'll mirror `displayed`
+        .objectLat((d: ShipPoint) => d.lat)
+        .objectLng((d: ShipPoint) => d.lng)
+        .objectAltitude(0.028)
+        .objectThreeObject((d: ShipPoint) => buildShipGlow(d));
+
+      // === Playback over the year (progressively add items) ===
       const t0 = all[0].ts;
       const t1 = all[all.length - 1].ts;
 
       const displayed: ShipPoint[] = [];
-      globe.pointsData(displayed);
+      globe.pointsData(displayed);   // dots
+      globe.ringsData(displayed);    // rings follow same array
+      globe.objectsData(displayed);  // glowing spheres mirror the array
 
       const simMsPerSec = simHoursPerSec * 3600 * 1000;
       let simStartRT = performance.now();
@@ -150,10 +218,12 @@ export default function LiveGlobe({
       const restart = () => {
         displayed.length = 0;
         globe.pointsData(displayed);
+        globe.ringsData(displayed);
+        globe.objectsData(displayed);
         simStartRT = performance.now();
         simStartTs = t0;
         idx = 0;
-        // don't auto-resume spin here; user intent is focused on selection flow
+        // do not auto-resume rotate here—user intent stays respected
       };
 
       const tick = () => {
@@ -162,12 +232,16 @@ export default function LiveGlobe({
         const rtNow = performance.now();
         const simNow = simStartTs + (rtNow - simStartRT) * (simMsPerSec / 1000);
 
+        // append any new detections whose ts <= simNow
         while (idx < all.length && all[idx].ts <= simNow) {
           displayed.push(all[idx]);
           idx++;
         }
 
+        // rebind data so rings/objects/dots get the new ones
         globe.pointsData(displayed);
+        globe.ringsData(displayed);
+        globe.objectsData(displayed);
 
         if (simNow >= t1) restart();
         timerRef.current = requestAnimationFrame(tick);
@@ -193,12 +267,9 @@ export default function LiveGlobe({
 
   const fmt = (n?: number, digits = 3) => (typeof n === "number" ? n.toFixed(digits) : "—");
 
-  // When the info panel closes, resume auto-rotate
   const closePanel = () => {
     setSelected(null);
-    if (controlsRef.current) {
-      controlsRef.current.autoRotate = true; // ▶️ resume spin when panel closes
-    }
+    if (controlsRef.current) controlsRef.current.autoRotate = true; // resume spin when closing
   };
 
   return (
